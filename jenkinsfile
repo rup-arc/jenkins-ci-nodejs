@@ -1,26 +1,14 @@
 pipeline {
-    agent {
-        docker {
-            image 'node:18'        
-            args '-u root'         
-        }
-    }
+    agent any
 
     environment {
-        DOCKER_IMAGE = "iamruparc/devops-task"
+        DOCKER_IMAGE = "rup-arc/nodejs-app"    // your DockerHub repo
         AWS_REGION = "ap-south-1"
         K8S_DEPLOYMENT_FILE = "k8s/deployment.yaml"
         K8S_SERVICE_FILE = "k8s/service.yaml"
     }
 
     stages {
-
-        stage('Clean Workspace') {
-            steps {
-                deleteDir()
-            }
-        }
-
         stage('Checkout') {
             steps {
                 git branch: 'dev', url: 'https://github.com/rup-arc/jenkins-ci-nodejs.git'
@@ -29,71 +17,37 @@ pipeline {
 
         stage('Install Dependencies & Test') {
             steps {
-                script {
-                    try {
-                        sh '''
-                            mkdir -p .npm-cache
-                            npm config set cache $(pwd)/.npm-cache --global
-                            npm install --unsafe-perm=true
-                            npm test || echo "No tests configured"
-                        '''
-                    } catch (err) {
-                        echo "⚠️ Warning: Install or test step failed — ${err}"
-                        error "Stopping pipeline due to failed install/test"
-                    }
-                }
+                sh 'npm install'
+                sh 'npm test || echo "No tests configured"'
             }
         }
 
         stage('Build & Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker build -t $DOCKER_IMAGE:$BUILD_NUMBER .
-                        docker push $DOCKER_IMAGE:$BUILD_NUMBER
-                    '''
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh 'docker build -t $DOCKER_IMAGE:$BUILD_NUMBER .'
+                    sh 'docker push $DOCKER_IMAGE:$BUILD_NUMBER'
                 }
             }
         }
 
         stage('Configure AWS & Deploy to EKS') {
-            agent any // Run on default Jenkins agent (outside Docker container)
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
-                                  credentialsId: 'aws-creds']]) {
+                withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
                     script {
-                        sh 'aws --version'
-                        sh 'kubectl version --client=true'
+                        // Update kubeconfig for EKS
+                        sh 'aws eks update-kubeconfig --name your-eks-cluster --region ${AWS_REGION}'
 
-                        // Update kubeconfig for EKS cluster
-                        sh "aws eks update-kubeconfig --region $AWS_REGION --name your-eks-cluster"
-
-                        // Replace image placeholder with actual image tag
+                        // Replace image placeholder in K8s deployment manifest
                         sh "sed -i 's|IMAGE_PLACEHOLDER|$DOCKER_IMAGE:$BUILD_NUMBER|g' ${K8S_DEPLOYMENT_FILE}"
 
-                        // Deploy to Kubernetes
-                        sh "kubectl apply -f ${K8S_DEPLOYMENT_FILE}"
-                        sh "kubectl apply -f ${K8S_SERVICE_FILE}"
+                        // Apply manifests
+                        sh 'kubectl apply -f ${K8S_DEPLOYMENT_FILE}'
+                        sh 'kubectl apply -f ${K8S_SERVICE_FILE}'
                     }
                 }
             }
-        }
-    }
-
-    post {
-        always {
-            echo  Pipeline execution completed.'
-        }
-        failure {
-            echo  Pipeline failed.'
-        }
-        success {
-            echo '✅ Pipeline succeeded.'
         }
     }
 }
