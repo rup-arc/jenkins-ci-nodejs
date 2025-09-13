@@ -1,0 +1,45 @@
+# 🚀 Node.js CI/CD Pipeline with Docker Hub, Kubernetes, Jenkins, and AWS EKS
+
+This project demonstrates a full CI/CD workflow for a **Node.js application** using:
+
+- **Docker** for containerization  
+- **Docker Hub** as the image registry  
+- **Terraform** for infrastructure provisioning (AWS EKS)  
+- **Jenkins** for CI/CD automation  
+- **Kubernetes** for deployment and orchestration
+
+---
+
+## 🧭 CI/CD Workflow Overview
+
+### 📌 Key Steps:
+1. Developer works on a **`dev`** branch
+2. Jenkins pipeline is triggered via webhook
+3. Jenkins:
+   - Builds Docker image
+   - Pushes to Docker Hub (`dev` tag)
+   - Deploys to EKS via Kubernetes YAMLs
+4. Once tested, code is **merged to `main`**
+5. Jenkins:
+   - Builds and tags image as `latest`
+   - Pushes to Docker Hub
+   - Redeploys to EKS
+
+---
+
+## 🛠️ Tech Stack
+
+| Tool         | Purpose                                |
+|--------------|----------------------------------------|
+| Node.js      | Backend Application                    |
+| Docker       | Containerize the app                   |
+| Docker Hub   | Store Docker images                    |
+| Kubernetes   | App deployment and orchestration       |
+| Terraform    | Infrastructure as Code (EKS Cluster)   |
+| Jenkins      | CI/CD automation                       |
+| AWS EKS      | Managed Kubernetes Service             |
+
+---
+
+## 🗂️ Repository Structure
+

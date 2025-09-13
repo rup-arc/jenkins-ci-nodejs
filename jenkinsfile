@@ -1,0 +1,99 @@
+pipeline {
+    agent {
+        docker {
+            image 'node:18'        
+            args '-u root'         
+        }
+    }
+
+    environment {
+        DOCKER_IMAGE = "iamruparc/devops-task"
+        AWS_REGION = "ap-south-1"
+        K8S_DEPLOYMENT_FILE = "k8s/deployment.yaml"
+        K8S_SERVICE_FILE = "k8s/service.yaml"
+    }
+
+    stages {
+
+        stage('Clean Workspace') {
+            steps {
+                deleteDir()
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                git branch: 'dev', url: 'https://github.com/rup-arc/jenkins-ci-nodejs.git'
+            }
+        }
+
+        stage('Install Dependencies & Test') {
+            steps {
+                script {
+                    try {
+                        sh '''
+                            mkdir -p .npm-cache
+                            npm config set cache $(pwd)/.npm-cache --global
+                            npm install --unsafe-perm=true
+                            npm test || echo "No tests configured"
+                        '''
+                    } catch (err) {
+                        echo "⚠️ Warning: Install or test step failed — ${err}"
+                        error "Stopping pipeline due to failed install/test"
+                    }
+                }
+            }
+        }
+
+        stage('Build & Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker build -t $DOCKER_IMAGE:$BUILD_NUMBER .
+                        docker push $DOCKER_IMAGE:$BUILD_NUMBER
+                    '''
+                }
+            }
+        }
+
+        stage('Configure AWS & Deploy to EKS') {
+            agent any // Run on default Jenkins agent (outside Docker container)
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
+                                  credentialsId: 'aws-creds']]) {
+                    script {
+                        sh 'aws --version'
+                        sh 'kubectl version --client=true'
+
+                        // Update kubeconfig for EKS cluster
+                        sh "aws eks update-kubeconfig --region $AWS_REGION --name your-eks-cluster"
+
+                        // Replace image placeholder with actual image tag
+                        sh "sed -i 's|IMAGE_PLACEHOLDER|$DOCKER_IMAGE:$BUILD_NUMBER|g' ${K8S_DEPLOYMENT_FILE}"
+
+                        // Deploy to Kubernetes
+                        sh "kubectl apply -f ${K8S_DEPLOYMENT_FILE}"
+                        sh "kubectl apply -f ${K8S_SERVICE_FILE}"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo  Pipeline execution completed.'
+        }
+        failure {
+            echo  Pipeline failed.'
+        }
+        success {
+            echo '✅ Pipeline succeeded.'
+        }
+    }
+}

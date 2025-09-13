@@ -17,5 +17,8 @@ spec:
       containers:
       - name: devops-task
         image: iamruparc/devops-task:latest
+
+        image: IMAGE_PLACEHOLDER
+
         ports:
         - containerPort: 3000
