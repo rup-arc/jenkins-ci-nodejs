@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: devops-task
-        image: your-dockerhub-username/devops-task:latest
+        image: iamruparc/devops-task :latest
         ports:
         - containerPort: 3000
