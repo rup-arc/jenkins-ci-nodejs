@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-task
+  labels:
+    app: devops-task
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: devops-task
+  template:
+    metadata:
+      labels:
+        app: devops-task
+    spec:
+      containers:
+      - name: devops-task
+        image: your-dockerhub-username/devops-task:latest
+        ports:
+        - containerPort: 3000
