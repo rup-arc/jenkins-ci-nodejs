@@ -1,0 +1,42 @@
+# Terraform files to ignore
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+terraform.tfstate.backup
+.terraform/
+
+# Local .terraform directories
+**/.terraform/*
+
+# CLI configuration files
+terraform.tfvars
+terraform.tfvars.json
+
+# Sensitive override files
+override.tf
+override.tf.json
+
+# Crash logs
+crash.log
+
+# Ignore editor swap files and system files
+*.swp
+*.swo
+*.bak
+*.backup
+*.tmp
+*.DS_Store
+*.idea/
+*.vscode/
+*.log
+
+# Ignore plan files (optional)
+*.tfplan
+
+# Ignore Kubernetes kubeconfig files if stored locally
+kubeconfig
+
+# Ignore any generated files or scripts outputs
+*.out
